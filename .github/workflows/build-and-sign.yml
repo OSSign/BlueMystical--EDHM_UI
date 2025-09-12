@@ -1,0 +1,39 @@
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-sign-win:
+    runs-on: windows-2025
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # - name: Set up Node.js
+      #   uses: actions/setup-node@v3
+      #   with:
+      #     node-version: '24'
+
+      - name: Install dependencies
+        run: |
+          ls C:\Program Files (x86)\Windows Kits\10\bin\
+      # yarn install --frozen-lockfile
+      
+
+
+      # - name: Build the project
+      #   run: npm run build
+
+      # - name: Sign the executable
+      #   env:
+      #     SIGNING_CERTIFICATE: ${{ secrets.SIGNING_CERTIFICATE }}
+      #     SIGNING_PASSWORD: ${{ secrets.SIGNING_PASSWORD }}
+      #   run: |
+      #     echo $SIGNING_CERTIFICATE | base64 -d > certificate.pfx
+      #     signtool sign /f certificate.pfx /p $SIGNING_PASSWORD /tr http://timestamp.digicert.com /td sha256 /fd sha256 path\to\your\executable.exe
+
+      # - name: Upload artifact
+      #   uses: actions/upload-artifact@v3
+      #   with:
+      #     name: signed-executable
