@@ -7,8 +7,8 @@ jobs:
   build-and-sign-win:
     runs-on: windows-2025
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+      # - name: Checkout repository
+      #   uses: actions/checkout@v3
 
       # - name: Set up Node.js
       #   uses: actions/setup-node@v3
@@ -17,7 +17,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          ls C:\Program Files (x86)\Windows Kits\10\bin\
+          ls "C:\Program Files (x86)\Windows Kits\10\bin\"
       # yarn install --frozen-lockfile
       
 
