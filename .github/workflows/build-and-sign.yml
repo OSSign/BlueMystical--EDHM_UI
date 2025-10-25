@@ -16,7 +16,7 @@ jobs:
           node-version: '24'
 
       - name: Install dependencies
-        run: yarn install --frozen-lockfile
+        run: cd source_v3/ && yarn install --frozen-lockfile
       
       - name: Install OSSign CLI
         uses: ossign/actions/setup-ossign@main
@@ -27,6 +27,7 @@ jobs:
         env:
           OSSIGN_CONFIG: ${{ secrets.OSSIGN_CONFIG }}
         run: |
+          cd source_v3/
           npm run make && npm run publish
           ls
           ls out/
@@ -36,7 +37,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: build-artifacts
-          path: out/
+          path: source_v3/out/
 
       # - name: Sign the executable
       #   env:
