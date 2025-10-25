@@ -28,9 +28,12 @@ module.exports = {
       "requested-execution-level": "highestAvailable"
     },
     windowsSign: {
-      signToolPath: "ossign",
-      signWithParams: "-t pecoff",
-      hashes: ["sha256"]
+      hookFunction: async ( file ) => {
+            var result = await require('child_process').spawnSync( 'ossign', [ 'sign', '-t', 'pecoff', file, '-o', file ] );
+            if ( result.status !== 0 ) {
+                throw new Error( `Failed to sign ${file}: ${result.stderr.toString()}` );
+            }
+        }
     }
   },
   makers: [
@@ -57,9 +60,12 @@ module.exports = {
         //certificateFile:  './src/data/etc/EDHM-UI-V3.pfx',
         //certificatePassword:  reveal('ODo8NG1rcm9vcGRRQw==') 
         windowsSign: {
-          signToolPath: "ossign",
-          signWithParams: "-t pecoff",
-          hashes: ["sha256"]
+          hookFunction: async ( file ) => {
+              var result = await require('child_process').spawnSync( 'ossign', [ 'sign', '-t', 'pecoff', file, '-o', file ] );
+              if ( result.status !== 0 ) {
+                  throw new Error( `Failed to sign ${file}: ${result.stderr.toString()}` );
+              }
+          }
         }
       }
     },
