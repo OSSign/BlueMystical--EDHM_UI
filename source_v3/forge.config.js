@@ -27,14 +27,6 @@ module.exports = {
       CompanyName: 'Blue Mystic',
       "requested-execution-level": "highestAvailable"
     },
-    windowsSign: {
-      hookFunction: async ( file ) => {
-            var result = await require('child_process').spawnSync( 'ossign', [ 'sign', '-t', 'pecoff', file, '-o', file ] );
-            if ( result.status !== 0 ) {
-                throw new Error( `Failed to sign ${file}: ${result.stderr.toString()}` );
-            }
-        }
-    }
   },
   makers: [
     {
@@ -59,14 +51,6 @@ module.exports = {
         //certificateFile: path.join(__dirname, 'src','data','etc','EDHM-UI-V3.pfx'), // './src/data/etc/EDHM-UI-V3.pfx',
         //certificateFile:  './src/data/etc/EDHM-UI-V3.pfx',
         //certificatePassword:  reveal('ODo8NG1rcm9vcGRRQw==') 
-        windowsSign: {
-          hookFunction: async ( file ) => {
-              var result = await require('child_process').spawnSync( 'ossign', [ 'sign', '-t', 'pecoff', file, '-o', file ] );
-              if ( result.status !== 0 ) {
-                  throw new Error( `Failed to sign ${file}: ${result.stderr.toString()}` );
-              }
-          }
-        }
       }
     },
     {

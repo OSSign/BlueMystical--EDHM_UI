@@ -18,20 +18,28 @@ jobs:
       - name: Install dependencies
         run: cd source_v3/ && yarn install --frozen-lockfile
       
-      - name: Install OSSign CLI
-        uses: ossign/actions/setup-ossign@main
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Build the project
-        env:
-          OSSIGN_CONFIG: ${{ secrets.OSSIGN_CONFIG }}
         run: |
           cd source_v3/
           npm run make && npm run publish
           ls
           ls out/
-
+      
+      - name: Sign the application
+        uses: ossign/ossign@main
+        with:
+          config: ${{ secrets.OSSIGN_CONFIG }}
+          inputFiles: 'source_v3/out/**/*.exe'
+          fileType: "pecoff"
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Sign the installer(s)
+        uses: ossign/ossign@main
+        with:
+          config: ${{ secrets.OSSIGN_CONFIG }}
+          inputFiles: 'source_v3/out/**/*.msi'
+          fileType: "msi"
+          token: ${{ secrets.GITHUB_TOKEN }}
       
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
