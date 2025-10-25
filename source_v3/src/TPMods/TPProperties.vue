@@ -32,6 +32,15 @@
                                 </div>
                             </template>
 
+                            <!-- On/Off Boolean -->
+                            <template v-if="key.type.toLowerCase() === 'boolean'">
+                                <div class="form-check form-switch" :id="'element-' + key.key">
+                                    <input class="form-check-input larger-switch" type="checkbox"
+                                        :checked="key.value === 'false'"
+                                        @change="OnBooleanValueChange(sectionIndex, key, $event)" />
+                                </div>
+                            </template>
+
                             <!-- Range Slider Control -->
                             <template v-else-if="key.type.toLowerCase().startsWith('decimal')">
                                 <div class="range-container" :id="'element-' + key.Key">
@@ -60,7 +69,7 @@
                             <!-- Standard Numeric Input -->
                             <template v-else-if="key.type.toLowerCase().startsWith('number')">
                                 <input type="number" :id="'element-' + key.Key" class="form-control" aria-describedby=""
-                                    v-model="key.value" @change="OnTextValueChange(sectionIndex, key, $event)">
+                                    v-model="key.value" @change="OnNumberValueChange(sectionIndex, key, $event)">
                             </template>
 
                             <!-- Dynamic Preset Select Combo -->
@@ -409,7 +418,7 @@ export default {
         setXmlValueDOM(xmlString, path, newValue) {
             const parser = new DOMParser();
             const xmlDoc = parser.parseFromString(xmlString, 'text/xml');
-            // console.log('setXmlValueDOM - Root Element Tag:', xmlDoc.documentElement.tagName);
+            console.log('setXmlValueDOM - Root Element Tag:', xmlDoc.documentElement.tagName);
 
             const rootElementTag = xmlDoc.documentElement.tagName;
             const elements = path.split('/').filter(p => p !== '');
@@ -502,6 +511,10 @@ export default {
         // #region METHODS TO UPDATE CHANGES IN THE CONTROLS 
 
         OnTextValueChange(sectionIndex, item, event) {
+            const value = event.target.value; 
+            this.updateDataSourceValue(sectionIndex, item, value);
+        },
+        OnNumberValueChange(sectionIndex, item, event) {
             const value = parseFloat(event.target.value);
             this.updateDataSourceValue(sectionIndex, item, value);
         },
@@ -516,6 +529,10 @@ export default {
         },
         OnToggleValueChange(sectionIndex, item, event) {
             const value = event.target.checked ? 1 : 0;
+            this.updateDataSourceValue(sectionIndex, item, value);
+        },
+        OnBooleanValueChange(sectionIndex, item, event) {
+            const value = event.target.checked ? true : false;
             this.updateDataSourceValue(sectionIndex, item, value);
         },
         OnColorValueChange(sectionIndex, item, event) {

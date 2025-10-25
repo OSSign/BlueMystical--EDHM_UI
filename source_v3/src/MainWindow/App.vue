@@ -96,19 +96,19 @@ export default {
         const ActiveInstance = await window.api.getActiveInstance();  //console.log('ActiveInstance', ActiveInstance);
         let VirginPlayer = false; //<- Flag to know if is the first time running the app
 
-        //- Apply the Font Size taken from the Settings:
-        const fontSizeMap = {
-          small: '12px',
-          medium: '14px',
-          large: '16px',
-          'x-large': '18px'
-        };
+        //- Apply the Font Size taken from the Settings: Escucha el evento desde el main/preload
         window.api.onFontSizeSetting((event, size) => {
-          const fontSize = fontSizeMap[size] || fontSizeMap['medium'];
-          //console.log('fontSize', fontSize);
+          const fontSize = this.normalizeFontSize(size); //          console.log('onFontSizeSetting: ', size, fontSize);
+
+          // Aplicar la variable global
           setTimeout(() => {
             document.documentElement.style.setProperty('--user-font-size', fontSize);
           }, 0);
+          try {
+             window.api.writeSetting('FontSize', fontSize);
+          } catch (err) {
+            console.warn('No se pudo actualizar FontSize en settings:', err);
+          }
         });
 
         this.$nextTick(() => {
@@ -179,6 +179,23 @@ export default {
         .catch((err) => {
           console.error('Failed to copy to clipboard: ', err);
         });
+    },
+
+    normalizeFontSize(raw) {
+      // Si ya es un valor CSS válido (px, rem, em, %), lo devolvemos tal cual
+      if (/^\d+(\.\d+)?(px|rem|em|%)$/i.test(raw)) {
+        return raw;
+      }
+
+      // Mapeo para valores antiguos
+      const legacyMap = {
+        small: '12px',
+        medium: '14px',
+        large: '16px',
+        'x-large': '18px'
+      };
+
+      return legacyMap[raw] || legacyMap['medium']; // fallback seguro
     },
 
     // #region Settings Changed
@@ -280,20 +297,31 @@ export default {
       }
     },
 
+    /** When a theme is Applied
+     * @param event the template of the theme     */
+    OnThemeApplied(event) {
+      try {
+        this.themeTemplate = JSON.parse(JSON.stringify(event));
+        console.log('Theme Applied: ', this.themeTemplate.credits.theme);        
+        //EventBus.emit('InitializeProperties', JSON.parse(JSON.stringify(this.themeTemplate))); //<- Event Listened at PropertiesTabEx.vue
+      } catch (error) {
+        EventBus.emit('ShowError', error);
+      }
+    },
+
     /** This will take your currently applied settings and Save them into the Selected Theme * 
     * @param e Selected Theme Data   */
     async DoUpdateTheme(e) {
       //console.log(e);
       if (e && e.theme != null) { //<-- The Selected Theme
-        const NewThemeData = JSON.parse(JSON.stringify(e.theme));
-        const CurrentSettings = JSON.parse(JSON.stringify(e.source));
-
-        const _ret = await window.api.UpdateTheme(NewThemeData, CurrentSettings);
+        const _ret = await window.api.UpdateTheme(
+          JSON.parse(JSON.stringify(e.theme)), 
+          JSON.parse(JSON.stringify(e.source))
+        );
         console.log('UpdatedTheme:', _ret);
-
         if (_ret) {
           EventBus.emit('loadThemes', null); //<- Event Listened on ThemeTab.vue
-          EventBus.emit('RoastMe', { type: 'Success', message: `Theme: '${NewThemeData.credits.theme}' Saved.` });
+          EventBus.emit('RoastMe', { type: 'Success', message: `Theme: '${e.theme.credits.theme}' Saved.` });
         }
       }
     },
@@ -714,27 +742,6 @@ export default {
         console.error('Error cargando notificación de mantenimiento:', err);
       }
     },
-    /*async CheckForMaintenanceNotice() {
-      // Checks for any Maintenance Notice from the Server
-      try {
-        const TempDir = await window.api.resolveEnvVariables('%LOCALAPPDATA%\\Temp\\EDHM_UI\\status.json');
-        const data = await window.api.downloadAsset(
-          'https://raw.githubusercontent.com/BlueMystical/EDHM_UI/refs/heads/main/status.json',
-          TempDir
-        );
-        console.log('Maintenance Notice:', data);
-        if (data.info && data.info.trim() !== '') {
-          EventBus.emit('RoastMe', {
-            type: data.status,
-            message: data.info,
-            autoHide: false,
-            width:'480px'
-          });
-        }
-      } catch (err) {
-        console.error('Error cargando notificación de mantenimiento:', err);
-      }
-    },*/
     async AnalyseUpdate(latesRelease) {
       try {
         const localVersion = await window.api.getAppVersion();
@@ -761,35 +768,47 @@ export default {
           const platform = await window.api.getPlatform();
           var download_url = '';  
 
-          window.api.ShowMessageBox(options).then(result => {
+          window.api.ShowMessageBox(options).then(async result => {
             if (result && result.response === 1) {
 
-              if (platform === 'win32') {
-                console.log('Running on Windows');
-                //download_url = 'https://github.com/BlueMystical/EDHM_UI/releases/download/' + serverVersion + '/edhm-ui-v3-windows-x64.exe';
-                download_url = 'https://github.com/BlueMystical/EDHM_UI/releases/latest/download/edhm-ui-v3-windows-x64.exe';
-
-              } else if (platform === 'linux') {
-                console.log('Running on Linux');
-                //download_url = 'https://github.com/BlueMystical/EDHM_UI/releases/download/' + serverVersion + '/edhm-ui-v3-linux-x64.zip';
-                download_url = 'https://github.com/BlueMystical/EDHM_UI/releases/latest/download/edhm-ui-v3-linux-x64.zip';
-                fileSavePath = '/tmp/EDHM_UI/edhm-ui-v3-linux-x64.zip';
-
+              // 1. Check if the Game is already Running:
+              const fullPath = await window.api.detectProgram('EliteDangerous64.exe');
+              if (fullPath) {
+                console.log('Process found at:', fullPath);
+                EventBus.emit('RoastMe', {
+                  type: 'Accent', accent: 'error', background: 'warning',
+                  title: 'Can NOT update!', message: 'The game is Running<br>You need to close it to allow the update to be installed<br>Try again after closing the game.',
+                  width:'460px', autoHide: false
+                });
+                return;
               } else {
+                if (platform === 'win32') {
+                  console.log('Running on Windows');
+                  //download_url = 'https://github.com/BlueMystical/EDHM_UI/releases/download/' + serverVersion + '/edhm-ui-v3-windows-x64.exe';
+                  download_url = 'https://github.com/BlueMystical/EDHM_UI/releases/latest/download/edhm-ui-v3-windows-x64.exe';
+
+                } else if (platform === 'linux') {
+                  console.log('Running on Linux');
+                  //download_url = 'https://github.com/BlueMystical/EDHM_UI/releases/download/' + serverVersion + '/edhm-ui-v3-linux-x64.zip';
+                  download_url = 'https://github.com/BlueMystical/EDHM_UI/releases/latest/download/edhm-ui-v3-linux-x64.zip';
+                  fileSavePath = '/tmp/EDHM_UI/edhm-ui-v3-linux-x64.zip';
+
+                } else {
                   console.log(`Running on an unknown platform: ${platform}`);
                   return;
-              }
-              
-              //- Send the Command to start the Download
-              EventBus.emit('StartDownload', {  //<- Event Listen in 'NavBars.vue' -> DownloadAndInstallUpdate()
-                url: download_url, 
-                save_to: fileSavePath, 
-                platform: platform 
-              }); 
+                }
 
-            }
-            if (result && result.response === 2) {
-              EventBus.emit('RoastMe', { type: 'Info', message: 'There is an Update Available: ' + serverVersion, autoHide: false });
+                //- Send the Command to start the Download
+                EventBus.emit('StartDownload', {  //<- Event Listen in 'NavBars.vue' -> DownloadAndInstallUpdate()
+                  url: download_url,
+                  save_to: fileSavePath,
+                  platform: platform
+                });
+
+              }
+              if (result && result.response === 2) {
+                EventBus.emit('RoastMe', { type: 'Info', message: 'There is an Update Available: ' + serverVersion, autoHide: false });
+              }
             }
           });
         }
@@ -816,21 +835,31 @@ export default {
     /* LISTENING EVENTS:   */
     EventBus.on('SettingsChanged', this.OnProgramSettings_Changed);
     EventBus.on('OnUpdateSettings', this.OnProgramSettings_Updated);
-
     EventBus.on('GameInsanceChanged', this.OnGameInstance_Changed);
 
     EventBus.on('OnThemesLoaded', this.OnThemesLoaded);
+    EventBus.on('OnThemeApplied', this.OnThemeApplied);
     EventBus.on('ThemeLoaded', this.OnTemplateLoaded);
     EventBus.on('SearchBox', this.OnSearchBox_Shown);
 
     EventBus.on('OnCreateTheme', this.OnCreateTheme);
     EventBus.on('OnEditTheme', this.OnCreateTheme);
-    EventBus.on('DoUpdateTheme', this.DoUpdateTheme);
+    EventBus.on('DoUpdateTheme', this.DoUpdateTheme);    
 
     EventBus.on('OnShowXmlEditor', this.OnShowXmlEditor);
     EventBus.on('LookForUpdates', this.LookForUpdates);
 
     EventBus.on('StartShipyard', this.StartShipyard);
+
+    window.api.events.onEvent('RoastMe', (payload) => {
+      EventBus.emit('RoastMe', payload)
+    });
+    window.api.events.onEvent('ShowError', (payload) => {
+      EventBus.emit('ShowError', payload)
+    });
+    window.api.events.onEvent('SettingsChanged', (payload) => {
+      EventBus.emit('SettingsChanged', payload)
+    });
   },
   beforeUnmount() {
     // Clean up the event listener
@@ -841,6 +870,7 @@ export default {
     EventBus.off('SearchBox', this.OnSearchBox_Shown);
 
     EventBus.off('OnThemesLoaded', this.OnThemesLoaded);
+    EventBus.off('OnThemeApplied', this.OnThemeApplied);
     EventBus.off('ThemeLoaded', this.OnTemplateLoaded);
 
     EventBus.off('OnCreateTheme', this.OnCreateTheme);
@@ -863,10 +893,7 @@ export default {
 body {
   font-size: var(--user-font-size, 14px);
 }
-
 .visually-hidden {
   color: #ffffff;
 }
 </style>
-
-

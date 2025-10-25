@@ -217,6 +217,7 @@ export default {
             TPmods: [],
             ModsCounter: 0,
             TEMP_FOLDER: '',
+            THEME_SETTINGS_PATH: '',
 
             selectedMod: null,
             selectedModBasename: null, // Para rastrear el mod seleccionado
@@ -257,11 +258,21 @@ export default {
                 this.showSpinner = true;
                 this.statusText = 'Initializing..';
 
+                this.THEME_SETTINGS_PATH = window.api.joinPath(this.ActiveInstance.path, 'EDHM-ini', 'ThemeSettings.json');
+                console.log('THEME_SETTINGS_PATH', this.THEME_SETTINGS_PATH);
+
                 this.TEMP_FOLDER = await window.api.resolveEnvVariables('%LOCALAPPDATA%\\Temp\\EDHM_UI'); //console.log(this.TEMP_FOLDER);
                 await window.api.ensureDirectoryExists(this.TEMP_FOLDER);
                 const destFile = window.api.joinPath(this.TEMP_FOLDER, 'tpmods_list.json');
 
-                const availableMods = await window.api.downloadAsset(TPMODS_URL, destFile);             //console.log('Available Mods:', modsList);
+                let availableMods = [];
+                try {
+                    availableMods = await window.api.downloadAsset(TPMODS_URL, destFile);             //console.log('Available Mods:', modsList);
+                } catch (err) {                    
+                    console.error(err);
+                    EventBus.emit('RoastMe', { type: 'Error', title: err.name, message: err.message });
+                }   
+
                 const installedMods = await window.api.GetInstalledTPMods(this.ActiveInstance.path);    //console.log('Installed Mods:', installedMods);
 
                 this.TPmods = [];
@@ -281,6 +292,7 @@ export default {
 
         async LoadTPMods(availableMods, installedMods) {
             let _ret = [];
+            let Errors = [];
             try {
 
                 this.ModsCounter = 0;
@@ -288,60 +300,67 @@ export default {
                     this.TPmods = [];
 
                     for (const mod of availableMods) {
+                        try {
+                            let listedMod = {
+                                mod_name: mod.mod_name,
+                                description: mod.description,
+                                author: mod.author,
+                                mod_version: mod.mod_version,
+                                download_url: mod.download_url,
+                                thumbnail_url: mod.thumbnail_url,
+                                changelog: mod.changelog,
 
-                        let listedMod = {
-                            mod_name: mod.mod_name,
-                            description: mod.description,
-                            author: mod.author,
-                            mod_version: mod.mod_version,
-                            download_url: mod.download_url,
-                            thumbnail_url: mod.thumbnail_url,
-                            changelog: mod.changelog,
+                                file_json: null,
+                                file_ini: null,
+                                data: null,
+                                data_ini: null,
+                                read_me: mod.read_me,
 
-                            file_json: null,
-                            file_ini: null,
-                            data: null,
-                            data_ini: null,
+                                path: null,
+                                basename: null,
+                                isActive: false,
+                                isUpdateAvaliable: false,
+                                childs: []
+                            };
 
-                            path: null,
-                            basename: null,
-                            isActive: false,
-                            isUpdateAvaliable: false,
-                            childs: []
-                        };
+                            if (installedMods && installedMods.mods) {
+                                //- Check if the mod is installed:
+                                const found = installedMods.mods.findIndex((item) => item && item.data.mod_name === mod.mod_name);
+                                if (found >= 0) {
+                                    //- Mod is installed    
+                                    const fMod = installedMods.mods[found];
+                                    fMod.isActive = true;
 
-                        if (installedMods && installedMods.mods) {
-                            //- Check if the mod is installed:
-                            const found = installedMods.mods.findIndex((item) => item && item.data.mod_name === mod.mod_name);
-                            if (found >= 0) {
-                                //- Mod is installed    
-                                const fMod = installedMods.mods[found];
-                                fMod.isActive = true;
+                                    listedMod.isUpdateAvaliable = Util.compareVersions(mod.mod_version, fMod.data.version);
+                                    listedMod.isActive = true;
 
-                                listedMod.isUpdateAvaliable = Util.compareVersions(mod.mod_version, fMod.data.version);
-                                listedMod.isActive = true;
+                                    listedMod.file_json = fMod.file_json;
+                                    listedMod.file_ini = fMod.file_ini;
 
-                                listedMod.file_json = fMod.file_json;
-                                listedMod.file_ini = fMod.file_ini;
+                                    listedMod.data = await this.applyIniData(fMod.data, fMod.data_ini),
+                                        listedMod.data_ini = fMod.data_ini;
 
-                                listedMod.data = await this.applyIniData(fMod.data, fMod.data_ini),
-                                    listedMod.data_ini = fMod.data_ini;
+                                    listedMod.path = fMod.path;
+                                    listedMod.basename = window.api.getBaseName(fMod.file_json, '.json');
 
-                                listedMod.path = fMod.path;
-                                listedMod.basename = window.api.getBaseName(fMod.file_json, '.json');
-
-                                this.ModsCounter++;
+                                    this.ModsCounter++;
+                                }
                             }
+
+                            _ret.push(listedMod);
+                        } catch (error) {
+                            console.log(error);
+                            Errors.errors.push({ mod: mod, msg: 'Error processing mod entry: ' + error.message });
+                            continue;
                         }
-
-                        _ret.push(listedMod);
                     };
+                }
 
-                    //-- Add any non-list mod that is installed:
-                    if (installedMods && installedMods.mods) {
-
-                        let prevMod = null;
-                        for (const iMod of installedMods.mods) {
+                //-- Add any non-list mod that is installed:
+                if (installedMods && installedMods.mods) {
+                    let prevMod = null;
+                    for (const iMod of installedMods.mods) {
+                        try {
                             prevMod = {
                                 mod_name: iMod.data.mod_name,
                                 description: iMod.data.description,
@@ -370,16 +389,22 @@ export default {
                                 _ret.push(prevMod);
                                 this.ModsCounter++;
                             }
+                        } catch (error) {
+                            console.log(error);
+                            Errors.push({ mod: iMod, msg: 'Error processing mod entry: ' + error.message });
+                            continue;
                         }
                     }
-                    if (installedMods && installedMods.errors && installedMods.errors.length > 0) {
-                        console.log('There was some errors: ', installedMods.errors);
-                        var msg = '';
-                        installedMods.errors.forEach(err => {
-                            msg += err.msg + '<br>';
-                        });
-                        EventBus.emit('ShowError', new Error(msg));
-                    }
+                }
+
+                console.log('Errors:', Errors);
+                if (installedMods && installedMods.errors && installedMods.errors.length > 0) {
+                    console.log('There was some errors: ', installedMods.errors);
+                    var msg = '';
+                    installedMods.errors.forEach(err => {
+                        msg += err.msg + '<br>';
+                    });
+                    EventBus.emit('ShowError', new Error(msg));
                 }
 
             } catch (error) {
@@ -499,40 +524,49 @@ export default {
          * @param htmlString Original HTML string
          * @param imageBasePath Path where the image should be located         */
         convertImageTags(htmlString, imageBasePath) {
-            const customImageRegex = /<image=([^;>]+)(;size=([^;>]+))?(;align=([^>]+))?>/g;
-            const standardImageRegex = /<img[^>]*>/g; // Matches standard <img> tags
+            try {
+                const customImageRegex = /<image=([^;>]+)(;size=([^;>]+))?(;align=([^>]+))?>/g;
+                const standardImageRegex = /<img[^>]*>/g; // Matches standard <img> tags
+                if (imageBasePath) {
+                    // Process custom <image> tags
+                    let modifiedHtml = htmlString.replace(customImageRegex, (match, filename, sizeMatch, size, alignMatch, align) => {
+                        const imagePath = window.api.joinPath(imageBasePath, 'assets', filename);
+                        let imgTag = `<img src="file://${imagePath}"`;
 
-            // Process custom <image> tags
-            let modifiedHtml = htmlString.replace(customImageRegex, (match, filename, sizeMatch, size, alignMatch, align) => {
-                const imagePath = window.api.joinPath(imageBasePath, 'assets', filename);
-                let imgTag = `<img src="file://${imagePath}"`;
+                        if (size) {
+                            const [width, height] = size.split(',');
+                            imgTag += ` width="${width}" height="${height}"`;
+                        }
 
-                if (size) {
-                    const [width, height] = size.split(',');
-                    imgTag += ` width="${width}" height="${height}"`;
+                        if (align) {
+                            imgTag += ` style="vertical-align: ${align};"`;
+                        }
+
+                        imgTag += '>';
+                        return imgTag;
+                    });
+
+                    // Process standard <img> tags (optional: you can modify them if needed)
+                    // If you don't want to modify them, you can remove this part.
+                    modifiedHtml = modifiedHtml.replace(standardImageRegex, (match) => {
+                        return match; // Return the original <img> tag
+                    });
+                    return modifiedHtml;
                 }
-
-                if (align) {
-                    imgTag += ` style="vertical-align: ${align};"`;
+                else {
+                    return htmlString;
                 }
-
-                imgTag += '>';
-                return imgTag;
-            });
-
-            // Process standard <img> tags (optional: you can modify them if needed)
-            // If you don't want to modify them, you can remove this part.
-            modifiedHtml = modifiedHtml.replace(standardImageRegex, (match) => {
-                return match; // Return the original <img> tag
-            });
-
-            return modifiedHtml;
+            } catch (error) {
+                console.error(error);
+                return htmlString;
+            }
         },
 
         // #endregion
 
         // #region Control Events
         
+        //- When selecting a mod on the left side list:
         async onSelectMod(mod) {
             this.selectedMod = mod;
             this.selectedModBasename = mod.mod_name;
@@ -559,10 +593,17 @@ export default {
             // Aquí puedes agregar la lógica para el menú contextual
             console.log('Click derecho en mod:', mod);
         },
+
+        //- After any change on the mod's data:
         async OnValuesChanged(e) {
             //console.log('OnValuesChanged event received.', e);
             this.selectedMod = e;
+            //- Writes changes to the Mod's JSON file:
             const _retJsn = await window.api.writeJsonFile(e.file_json, e.data, true);
+            //- Update Current Settings to tell EDHM to auto-refresh colors in game:
+            const TSupdated = await window.api.updateFileDates(this.THEME_SETTINGS_PATH);
+            console.log(TSupdated);
+
             let _retIni = true;
             if (e.data.mod_type === 'INIConfig' ) {
                 _retIni = await window.api.SaveIniFile(e.file_ini, e.data_ini);
@@ -570,6 +611,7 @@ export default {
             console.log('Mod Changes Saved?:', _retJsn, _retIni);
         },
 
+        // Display a Message informing about an Update available for selected mod:
         showUpdateAlert(message, pModData) {
             this.alert = {
                 title:      pModData.mod_name,
@@ -589,12 +631,19 @@ export default {
             this.showInfo = false;
         },  
 
-
         // #endregion
 
         // #region TOOLBAR BUTTON EVENTS
         
+        // Display a Message informing about the Mod's characteristics
         cmdReadMe_Click(e){
+            console.log(this.selectedMod);
+            if (this.selectedMod && this.selectedMod.read_me) {
+                this.showAlert = false;
+                this.showInfo = true; console.log('showInfo',this.showInfo );
+                this.infoMessage = this.convertImageTags(this.selectedMod.read_me, this.selectedMod.path);    
+                return;
+            }
             if (this.selectedMod && this.selectedMod.data.read_me) {  
                 this.showAlert = false;
                 this.showInfo = true; console.log('showInfo',this.showInfo );
