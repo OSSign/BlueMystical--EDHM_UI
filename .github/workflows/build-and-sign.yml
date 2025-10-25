@@ -5,28 +5,38 @@ on:
 
 jobs:
   build-and-sign-win:
-    runs-on: windows-2025
+    runs-on: windows-latest
     steps:
-      # - name: Checkout repository
-      #   uses: actions/checkout@v3
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
-      # - name: Set up Node.js
-      #   uses: actions/setup-node@v3
-      #   with:
-      #     node-version: '24'
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '24'
 
       - name: Install dependencies
-        run: |
-          winget install -e --accept-source-agreements --accept-package-agreements --id Microsoft.Azure.TrustedSigningClientTools
-          ls "C:\Program Files (x86)\Windows Kits\10\bin\10.0.26100.0\x64\signtool.exe"
-          ls "$env:LOCALAPPDATA\Microsoft\MicrosoftTrustedSigningClientTools\"
-
-      # yarn install --frozen-lockfile
+        run: yarn install --frozen-lockfile
       
+      - name: Install OSSign CLI
+        uses: ossign/actions/setup-ossign@main
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Build the project
+        env:
+          OSSIGN_CONFIG: ${{ secrets.OSSIGN_CONFIG }}
+        run: |
+          npm run make && npm run publish
+          ls
+          ls out/
 
-      # - name: Build the project
-      #   run: npm run build
+      
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: out/
 
       # - name: Sign the executable
       #   env:

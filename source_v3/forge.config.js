@@ -1,12 +1,12 @@
 // forge.config.js
 const { FusesPlugin } = require('@electron-forge/plugin-fuses');
 const { FuseV1Options, FuseVersion } = require('@electron/fuses');
+
 const fs = require('node:fs');
 const path = require('path');
 
 function reveal(r) { return atob(r).split("").map((r => String.fromCharCode(r.charCodeAt(0) - 3))).join("").split("").reverse().join("") };
 function safeInclude(n) { return fs.existsSync(n) ? n : null }
-
 
 
 /* ---  FOR WINDOWS --- */
@@ -26,6 +26,11 @@ module.exports = {
       ProductName: 'EDHM-UI-V3',
       CompanyName: 'Blue Mystic',
       "requested-execution-level": "highestAvailable"
+    },
+    windowsSign: {
+      signToolPath: "ossign",
+      signWithParams: "-t pecoff",
+      hashes: ["sha256"]
     }
   },
   makers: [
@@ -51,6 +56,11 @@ module.exports = {
         //certificateFile: path.join(__dirname, 'src','data','etc','EDHM-UI-V3.pfx'), // './src/data/etc/EDHM-UI-V3.pfx',
         //certificateFile:  './src/data/etc/EDHM-UI-V3.pfx',
         //certificatePassword:  reveal('ODo8NG1rcm9vcGRRQw==') 
+        windowsSign: {
+          signToolPath: "ossign",
+          signWithParams: "-t pecoff",
+          hashes: ["sha256"]
+        }
       }
     },
     {
