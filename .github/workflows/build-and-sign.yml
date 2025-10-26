@@ -46,7 +46,7 @@ jobs:
             **/*.exe
           fileType: "pecoff"
           token: ${{ secrets.GITHUB_TOKEN }}
-      
+
       # - name: Build the project
       #   run: |
       #     cd source_v3/
