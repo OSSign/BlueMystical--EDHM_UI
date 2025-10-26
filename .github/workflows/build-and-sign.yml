@@ -14,6 +14,14 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: '24'
+      
+      - name: Cache modules
+        uses: actions/cache@v3
+        with:
+          path: source_v3/node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('source_v3/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-node-modules-
 
       - name: Install dependencies
         run: cd source_v3/ && yarn install --frozen-lockfile
