@@ -45,25 +45,25 @@ jobs:
           fileType: "pecoff"
           token: ${{ secrets.GITHUB_TOKEN }}
       
-      
-      - name: Build the project
-        run: |
-          cd source_v3/
-          npm run publish
-          ls
-          ls out/
-          ls out/EDHM-UI-V3-win32-x64/
-          ls out/make/
-          ls out/make/squirrel.windows/
-          ls out/make/squirrel.windows/x64/
+       
+      # - name: Build the project
+      #   run: |
+      #     cd source_v3/
+      #     npm run publish
+      #     ls
+      #     ls out/
+      #     ls out/EDHM-UI-V3-win32-x64/
+      #     ls out/make/
+      #     ls out/make/squirrel.windows/
+      #     ls out/make/squirrel.windows/x64/
 
-      - name: Sign the application
-        uses: ossign/ossign@main
-        with:
-          config: ${{ secrets.OSSIGN_CONFIG }}
-          inputFiles: 'source_v3/out/make/squirrel.windows/x64/*.exe'
-          fileType: "pecoff"
-          token: ${{ secrets.GITHUB_TOKEN }}
+      # - name: Sign the application
+      #   uses: ossign/ossign@main
+      #   with:
+      #     config: ${{ secrets.OSSIGN_CONFIG }}
+      #     inputFiles: 'source_v3/out/make/squirrel.windows/x64/*.exe'
+      #     fileType: "pecoff"
+      #     token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
